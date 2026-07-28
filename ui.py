@@ -75,6 +75,17 @@ def readTextFile():
                     except ValueError:
                         errorLabel.config(text=f"{split[1]} is not a valid transit speed")
                         return
+                elif "radius" in toLower:
+                    if len(split) != 2:
+                        errorLabel.config(text="Invalid number of \"radius\" parameters in file")   
+                        return
+                    try:
+                        radius = int(split[1])
+                        errorLabel.config(text="")
+                        radiusText.insert(tk.END, radius)
+                    except ValueError:
+                        errorLabel.config(text=f"{split[1]} is not a valid radius")
+                        return
                 elif "generation" in toLower:
                     if len(split) != 2:
                         errorLabel.config(text="Invalid number of \"generation\" parameters in file")   
@@ -112,6 +123,7 @@ def formulateProblem():
     boats = 1
     surveySpeed = 1
     transitSpeed = 1
+    minimumRadius = 1
     numLines = 0
     whatIfs = []
     generation = 0
@@ -179,6 +191,13 @@ def formulateProblem():
             errorLabel.config(text=f"{transitText.get(1.0, "end-1c")} is not a valid transit speed")
             return
 
+    if (len(radiusText.get(1.0, "end-1c")) != 0):
+            try:
+                minimumRadius = float(radiusText.get(1.0, "end-1c"))
+                errorLabel.config(text="")
+            except ValueError:
+                errorLabel.config(text=f"{radiusText.get(1.0, "end-1c")} is not a valid radius")
+                return
 
     if (len(surveyText.get(1.0, "end-1c")) != 0):
         try:
@@ -235,10 +254,10 @@ def formulateProblem():
     #array to be filled with file names of pdfs
     pdfs = []
 
-    #sending problem to formulator
-    outputs = formulator.formulate(fileName, boats, weights, surveySpeed, transitSpeed, numLines, toPDFVar.get(), whatIfs, generation, writeToFileName, numSteps, 0)
+    # #sending problem to formulator
+    outputs = formulator.formulate(fileName, boats, weights, surveySpeed, transitSpeed, numLines, toPDFVar.get(), whatIfs, generation, writeToFileName, numSteps, 0, minimumRadius)
 
-    #output format: [[status], [pdfFileName], [solutionLines]]
+    #output format: [[status], [pdfFileName], [trueObjectiveValue], [solutionLines]]
     for i, output in enumerate(outputs):
         if (output[0][0] == 0):
             if (toPDFVar.get()):
@@ -260,12 +279,12 @@ def formulateProblem():
             merger.write("finalPlot.pdf")
         merger.close()
         
-    # for purposes of producing multiple solutions
+    # for purposes of producing multiple solutions-----------------------------------------------------------------------------------------------------------------------
     # num = 0
     # while num < 4:
     #     outputs = formulator.formulate(fileName, boats, weights, surveySpeed, transitSpeed, numLines, toPDFVar.get(), whatIfs, generation, writeToFileName, numSteps, num)
 
-    #     #output format: [[status], [pdfFileName], [solutionLines]]
+    # #output format: [[status], [pdfFileName], [trueObjectiveValue], [solutionLines]]
     #     for i, output in enumerate(outputs):
     #         if (output[0][0] == 0):
     #             if (toPDFVar.get()):
@@ -288,6 +307,67 @@ def formulateProblem():
     #         else:   
     #             merger.write("finalPlot.pdf")
     #         merger.close()
+
+    # for purposes of testing what ifs----------------------------------------------------------------------------------------------------------------------------
+    # point1 = 0
+    # point2 = 0
+    # boat = 0
+    # while numLines < 50:
+    #     outputs = formulator.formulate(fileName, boats, weights, surveySpeed, transitSpeed, numLines, toPDFVar.get(), whatIfs, generation, writeToFileName, numSteps, 0)
+    #     originalObjectiveValue = outputs[0][2]
+    #     while boat < boats:
+    #         while point1 < numLines * 2:
+    #             while point2 < numLines * 2:
+    #                 point1comp = point1 + 1 if point1 % 2 == 0 else point1 - 1
+    #                 if point1 != point2 and point1comp != point2:
+    #                     whatIfs = [[boat, point1, point2]]
+    #                     outputs = formulator.formulate(fileName, boats, weights, surveySpeed, transitSpeed, numLines, toPDFVar.get(), whatIfs, generation, writeToFileName, numSteps, 0)
+
+    #                     #output format: [[status], [pdfFileName], [trueObjectiveValue], [solutionLines]]
+    #                     for i, output in enumerate(outputs):
+    #                         if (output[0][0] == 0):
+    #                             if (toPDFVar.get()):
+    #                                 pdfs.append(output[1])
+    #                             if output[2] < originalObjectiveValue:
+    #                                 with open(f"foo.txt", "a") as f:
+    #                                     f.write(f"Better solution found with what if: Boat {boat}, Point {point1}, Point {point2}, numBoats {boats}, numLines {numLines}: ORIGINAL {originalObjectiveValue} OJECTIVE VAL: {output[2]}\n")
+    #                         elif (output[0][0] == 1):
+    #                             errorLabel.config(text=f"No solution found")  
+    #                             with open(f"foo.txt", "a") as f:
+    #                                 f.write(f"No solution found for what if: Boat {boat}, Point {point1}, Point {point2}, numBoats {boats}, numLines {numLines}\n")
+    #                         elif (output[0][0] == 2):
+    #                             errorLabel.config(text=f"{output[0][1]}") 
+    #                 point2 += 1
+    #             point2 = 0
+    #             point1 += 1
+    #         point1 = 0
+    #         boat += 1
+    #     boat = 0
+    #     numLines += 1       
+    #     whatIfs = []
+            
+
+    # # for purposes of producing scaling plots-------------------------------------------------------------------------------------------------------------------------
+    # while boats < 6:
+    
+    #     while numLines < 101:
+    #         outputs = formulator.formulate(fileName, boats, weights, surveySpeed, transitSpeed, numLines, toPDFVar.get(), whatIfs, generation, writeToFileName, numSteps, 0, minimumRadius)
+
+    #         #output format: [[status], [pdfFileName], [trueObjectiveValue], [solutionLines]]
+    #         for i, output in enumerate(outputs):
+    #             if (output[0][0] == 0):
+    #                 if (toPDFVar.get()):
+    #                     pdfs.append(output[1])
+    #             elif (output[0][0] == 1):
+    #                 errorLabel.config(text=f"No solution found")  
+    #             elif (output[0][0] == 2):
+    #                 errorLabel.config(text=f"{output[0][1]}") 
+            
+    #         numLines += 1
+    #     boats += 1
+    #     numLines = boats
+    #     with open(f"foo.txt", "a") as f:
+    #         f.write(f"\n")
 
     return
         
@@ -402,6 +482,15 @@ transitText = tk.Text(master=root, height=1, width=30, )
 transitText.grid(row=row, column=1, sticky=W)
 
 row+=1
+
+radiusLabel = tk.Label(root, text="Enter Boat's Minimum Turning Radius (default is 1)")
+radiusLabel.grid(row=row, column=0, sticky=E, padx=10)
+
+radiusText = tk.Text(master=root, height=1, width=30, )
+radiusText.grid(row=row, column=1, sticky=W)
+
+row+=1
+
 
 whatIfLabel = tk.Label(root, text="Enter \"What-If\" line (\"boatnumber startpoint endpoint\")")
 whatIfLabel.grid(row=row, column=0, sticky=E, padx=10)

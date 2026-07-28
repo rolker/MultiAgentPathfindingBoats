@@ -1,4 +1,5 @@
 import gurobipy as gp
+from matplotlib.patches import Arc
 import numpy as np
 import pylab as plt
 from matplotlib import collections  as mc
@@ -9,25 +10,25 @@ from datetime import datetime
 def getMid(end):
     return end+1 if end % 2 == 0 else end-1
 
-def printTranscriptAndPlot(boat, start, end, Boats, EndPoints, points):
+def printTranscriptAndPlot(ax, boat, start, end, Boats, EndPoints, points, pathMatrix):
     
     if end >= EndPoints+Boats:
         print(f"Boat {boat} moves from endpoint {start} and ends at rendezvous {end}")
-        plotLine(boat, start, end, False, points)
+        plotTransit(ax, boat, start, end, points, pathMatrix)
 
     elif start >= EndPoints and start < EndPoints+Boats:
         mid = getMid(end)
         print(f"Boat {boat} moves from start point {start} and then traverses line ({mid},{end})")
-        plotLine(boat, start, mid, False, points)
-        plotLine(boat, mid, end, True, points)
+        plotTransit(ax, boat, start, end, points, pathMatrix)
+        plotLine(boat, mid, end, points)
 
     elif start < EndPoints:
         mid = getMid(end)
         print(f"Boat {boat} moves from endpoint {start} and then traverses line ({mid},{end})")
-        plotLine(boat, start, mid, False, points)
-        plotLine(boat, mid, end, True, points)
+        plotTransit(ax, boat, start, end, points, pathMatrix)
+        plotLine(boat, mid, end, points)
 
-def plotLine(boat, start, end, isPair, points):
+def plotLine(boat, start, end, points):
     boatColors = {
         0 : "red",
         1 : "blue",
@@ -35,16 +36,60 @@ def plotLine(boat, start, end, isPair, points):
         3 : "yellow",
         4 : "orange",
     }
+    
     if boat < 0:
         plt.plot([points[start][0], points[end][0]], [points[start][1], points[end][1]], color="black", alpha=0.01)
     else: 
-        if isPair:
-            plt.plot([points[start][0], points[end][0]], [points[start][1], points[end][1]], color=boatColors.get(boat % 5, "black"), linestyle='dashed', alpha=0.5)
-        else:
-            plt.plot([points[start][0], points[end][0]], [points[start][1], points[end][1]], color=boatColors.get(boat % 5, "black"), alpha=0.5)
+        plt.plot([points[start][0], points[end][0]], [points[start][1], points[end][1]], color=boatColors.get(boat % 5, "black"), alpha=0.5)
+        
+def plotTransit(ax, boat, start, end, points, pathMatrix):
+    boatColors = {
+        0 : "red",
+        1 : "blue",
+        2 : "green",
+        3 : "yellow",
+        4 : "orange",
+    }
+
+    if pathMatrix[start][end][0] != "LRL" and pathMatrix[start][end][0] != "RLR":
+        startCircle, startTheta1, startTheta2  = pathMatrix[start][end][1]
+        startCircleX, startCircleY, startCircleRadius = startCircle
+        
+        tanStart, tanEnd = pathMatrix[start][end][2]
+
+        goalCircle, goalTheta1, goalTheta2 = pathMatrix[start][end][3]
+        goalCircleX, goalCircleY, goalCircleRadius = goalCircle
+       
+
+        startArc = Arc((startCircleX, startCircleY), width=startCircleRadius*2, height=startCircleRadius*2, angle=0, theta1=startTheta1, theta2=startTheta2, color=boatColors.get(boat % 5, "black"), linestyle='dashed', alpha=0.5, lw=1.5)
+        ax.add_patch(startArc)
+
+        plt.plot([tanStart[0], tanEnd[0]], [tanStart[1], tanEnd[1]], color=boatColors.get(boat % 5, "black"), linestyle='dashed', alpha=0.5, lw=1.5)
+
+        goalArc = Arc((goalCircleX, goalCircleY), width=goalCircleRadius*2, height=goalCircleRadius*2, angle=0, theta1=goalTheta1, theta2=goalTheta2, color=boatColors.get(boat % 5, "black"), linestyle='dashed', alpha=0.5, lw=1.5)
+        ax.add_patch(goalArc)
+
+    else:
+        startCircle, startTheta1, startTheta2  = pathMatrix[start][end][1]
+        startCircleX, startCircleY, startCircleRadius = startCircle
+        
+        midCircle, midTheta1, midTheta2  = pathMatrix[start][end][2]
+        midCircleX, midCircleY, midCircleRadius = midCircle
+
+        goalCircle, goalTheta1, goalTheta2 = pathMatrix[start][end][3]
+        goalCircleX, goalCircleY, goalCircleRadius = goalCircle
+
+        startArc = Arc((startCircleX, startCircleY), width=startCircleRadius*2, height=startCircleRadius*2, angle=0, theta1=startTheta1, theta2=startTheta2, color=boatColors.get(boat % 5, "black"), linestyle='dashed', alpha=0.5, lw=1.5)
+        ax.add_patch(startArc)
+
+        midArc = Arc((midCircleX, midCircleY), width=midCircleRadius*2, height=midCircleRadius*2, angle=0, theta1=midTheta1, theta2=midTheta2, color=boatColors.get(boat % 5, "black"), linestyle='dashed', alpha=0.5, lw=1.5)
+        ax.add_patch(midArc)
+
+        goalArc = Arc((goalCircleX, goalCircleY), width=goalCircleRadius*2, height=goalCircleRadius*2, angle=0, theta1=goalTheta1, theta2=goalTheta2, color=boatColors.get(boat % 5, "black"), linestyle='dashed', alpha=0.5, lw=1.5)
+        ax.add_patch(goalArc)
 
 # prints problem solution to output and uses matplotlib to plot the solution
-def printProblem(model, x, numBoats, numLines, numEndPoints, points, Weight, transitSpeed, surveySpeed, toPDF, limitHit, maxes, pdfTitle):
+def printProblem(model, x, numBoats, numLines, numEndPoints, points, Weight, transitSpeed, surveySpeed, toPDF, limitHit, maxes, pdfTitle, pathMatrix):
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # plotting lines going between survey lines
@@ -54,17 +99,17 @@ def printProblem(model, x, numBoats, numLines, numEndPoints, points, Weight, tra
             for i in range(numEndPoints):
                 if i != j and i != k:
                     if(x[boat, j, i] > .5):
-                        printTranscriptAndPlot(boat, j, i, numBoats, numEndPoints, points)
+                        printTranscriptAndPlot(ax, boat, j, i, numBoats, numEndPoints, points, pathMatrix)
                     if(x[boat, k, i] > .5):
-                        printTranscriptAndPlot(boat, k, i, numBoats, numEndPoints, points)
+                        printTranscriptAndPlot(ax, boat, k, i, numBoats, numEndPoints, points, pathMatrix)
     
     # plotting lines going from start point/to rendezvous
     for boat in range(numBoats):
         for i in range(numEndPoints):
             if x[boat, numEndPoints+boat, i] > .5:
-                printTranscriptAndPlot(boat, numEndPoints+boat, i, numBoats, numEndPoints, points)
+                printTranscriptAndPlot(ax, boat, numEndPoints+boat, i, numBoats, numEndPoints, points, pathMatrix)
             if x[boat, i, numEndPoints+numBoats+boat] > .5:
-                printTranscriptAndPlot(boat, i, numEndPoints+numBoats+boat, numBoats, numEndPoints, points)
+                printTranscriptAndPlot(ax, boat, i, numEndPoints+numBoats+boat, numBoats, numEndPoints, points, pathMatrix)
     
     objectiveValue = model.ObjVal
     makespan = model.getVarByName('t').X
@@ -73,7 +118,6 @@ def printProblem(model, x, numBoats, numLines, numEndPoints, points, Weight, tra
         sumOfCosts = weightedSumOfCosts
     else:
         sumOfCosts = weightedSumOfCosts / Weight
-
 
     # Create a scatter plot for the points and label them
     x1, y = zip(*points)
@@ -85,8 +129,8 @@ def printProblem(model, x, numBoats, numLines, numEndPoints, points, Weight, tra
 
     #for step-through, center graph with max and min points
     if maxes != None:
-        plotLine(-1, 0, 1, True, maxes)
-        plotLine(-1, 2, 3, True, maxes)
+        plotLine(-1, 0, 1, maxes)
+        plotLine(-1, 2, 3, maxes)
 
     ax.autoscale()
 

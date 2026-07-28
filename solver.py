@@ -53,7 +53,7 @@ def newFindCycles(solution, numBoats, numLines):
         
     return cycles
 
-def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitSpeed, surveySpeed, toPDF, stepNumber, whatIfs, maxes, corner):
+def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitSpeed, surveySpeed, toPDF, stepNumber, whatIfs, maxes, boatOriginCorner, pathMatrix):
     SHOWPATHS = True
 
     # Create a Gurobi model
@@ -249,28 +249,30 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
             sumOfCosts = weightedSumOfCosts
         else:
             sumOfCosts = weightedSumOfCosts / Weight
-        unweightedObj = makespan + sumOfCosts
+        trueObjectiveValue = makespan + sumOfCosts
         
-        with open("scalingtimes.txt", "a") as f:
-            f.write(f"{objectiveValue}\n")
         print("\n")
-        obj = str(unweightedObj)
         if model.Status == GRB.TIME_LIMIT:
             returnList = [[0, 1]]
             print("Suboptimal Solution Found - Time Limit Hit:")
-            obj = obj + " 1"
+
         elif model.Status == GRB.OPTIMAL:
             print("Optimal Solution Found:")
             returnList = [[0, 0]]
-            obj = obj + " 0"
-        
+
+        if RUNTIME > 10:
+            RUNTIME = 10
+
+        with open(f"foo.txt", "a") as f:
+            f.write(f"{RUNTIME},{model.MIPGap},{returnList[0][1]}\n")
         # creating pdftitle for visualizer
         whatIfOut = ""
         if len(whatIfs) > 0:
             whatIfOut = "withWhatIfs"
-        pdfTitle = f"{numBoats}boats{numLines}lines{Weight}weight{stepNumber}step{whatIfOut}{corner}.pdf"  
+        pdfTitle = f"{numBoats}boats{numLines}lines{Weight}weight{stepNumber}step{whatIfOut}{boatOriginCorner}.pdf"  
         #appending pdfTitle to returnList for pdf merging
         returnList.append(pdfTitle)
+        returnList.append(trueObjectiveValue)
         
         print("Total coverage time:", model.objVal)
         X = {}
@@ -283,11 +285,11 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
                 # print(x.VarName)
                 X[int(ary[1]),int(ary[2]), int(ary[3])] = x.x
                 if x.x > .5: 
-                   returnList[2].append([int(ary[1]),int(ary[2]), int(ary[3])])        
+                   returnList[3].append([int(ary[1]),int(ary[2]), int(ary[3])])        
 
         if(SHOWPATHS):
             #sending solution to formulator
-            visualizer.printProblem(model, X, numBoats, numLines, numEndPoints, points, Weight, transitSpeed, surveySpeed, toPDF, model.status == GRB.TIME_LIMIT, maxes, pdfTitle)
+            visualizer.printProblem(model, X, numBoats, numLines, numEndPoints, points, Weight, transitSpeed, surveySpeed, toPDF, model.status == GRB.TIME_LIMIT, maxes, pdfTitle, pathMatrix)
         
         print("Total run time:", RUNTIME)
         cycles = newFindCycles(X, numBoats, numLines)
@@ -300,8 +302,6 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
                 output = output + str(len(cycle))
             output = output + ") detected!"
             print(output)
-            with open("cycles.txt", "a") as f:
-                f.write(f"{numBoats} boats, {numLines} lines: {output}\n")
         else: 
             print(f"No cycles detected")
 
@@ -309,5 +309,7 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
     
     else:
         print(f"No solution found for {numLines} lines, {numBoats} boats,  status code: {model.status}")
+        with open(f"foo.txt", "a") as f:
+            f.write(f"{numLines} no solution!\n")
         # Solution was infeaseable
         return [[1]]
