@@ -1,5 +1,4 @@
 from pyexpat import model
-
 import gurobipy as gp
 from gurobipy import GRB
 from timeit import default_timer as timer
@@ -53,7 +52,7 @@ def newFindCycles(solution, numBoats, numLines):
         
     return cycles
 
-def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitSpeed, surveySpeed, toPDF, stepNumber, whatIfs, maxes, boatOriginCorner, pathMatrix):
+def solve(numBoats, numEndPoints, points, numLines, costMatrices, Weight, transitSpeeds, surveySpeeds, toPDF, stepNumber, whatIfs, maxes, boatOriginCorner, pathMatrices, timeLimit=10):
     SHOWPATHS = True
 
     # Create a Gurobi model
@@ -92,19 +91,19 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
 
     # Objective Function
     model.setObjective((t + aggregateWeight *
-        (gp.quicksum(costMatrix[2*j][i] * x[boat, 2*j, i] for boat in range(numBoats) for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
-        gp.quicksum(costMatrix[2*j+1][i] * x[boat, 2*j+1, i] for boat in range(numBoats) for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
-        gp.quicksum(costMatrix[numEndPoints+boat][i] * x[boat, numEndPoints+boat,i] for boat in range(numBoats) for i in range(numEndPoints)) + 
-        gp.quicksum(costMatrix[i][numEndPoints+numBoats+boat] * x[boat, i,numEndPoints+numBoats+boat] for boat in range(numBoats) for i in range(numEndPoints)))),
+        (gp.quicksum(costMatrices[boat][2*j][i] * x[boat, 2*j, i] for boat in range(numBoats) for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
+        gp.quicksum(costMatrices[boat][2*j+1][i] * x[boat, 2*j+1, i] for boat in range(numBoats) for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
+        gp.quicksum(costMatrices[boat][numEndPoints+boat][i] * x[boat, numEndPoints+boat,i] for boat in range(numBoats) for i in range(numEndPoints)) + 
+        gp.quicksum(costMatrices[boat][i][numEndPoints+numBoats+boat] * x[boat, i,numEndPoints+numBoats+boat] for boat in range(numBoats) for i in range(numEndPoints)))),
         GRB.MINIMIZE)
 
     # Makespan Constraint
     for boat in range(numBoats):
         model.addConstr(
-            gp.quicksum(costMatrix[2*j][i] * x[boat, 2*j, i] for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
-            gp.quicksum(costMatrix[2*j+1][i] * x[boat, 2*j+1, i] for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
-            gp.quicksum(costMatrix[numEndPoints+boat][i] * x[boat, numEndPoints+boat,i]  for i in range(numEndPoints)) +
-            gp.quicksum(costMatrix[i][numEndPoints+numBoats+boat] * x[boat, i,numEndPoints+numBoats+boat] for i in range(numEndPoints))
+            gp.quicksum(costMatrices[boat][2*j][i] * x[boat, 2*j, i] for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
+            gp.quicksum(costMatrices[boat][2*j+1][i] * x[boat, 2*j+1, i] for j in range(numLines) for i in range(numEndPoints) if i != 2*j and i != 2*j+1) +
+            gp.quicksum(costMatrices[boat][numEndPoints+boat][i] * x[boat, numEndPoints+boat,i]  for i in range(numEndPoints)) +
+            gp.quicksum(costMatrices[boat][i][numEndPoints+numBoats+boat] * x[boat, i,numEndPoints+numBoats+boat] for i in range(numEndPoints))
             <= t)
 
     # Cover Constraint
@@ -222,7 +221,7 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
     model.Params.lazyConstraints = 1
 
     # Add 10 second time limit to optimization
-    model.setParam("TimeLimit", 10.0)
+    model.setParam("TimeLimit", timeLimit)
 
     # model.setParam("TuneTimeLimit", 3600.0)
     # model.tune()
@@ -260,16 +259,20 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
             print("Optimal Solution Found:")
             returnList = [[0, 0]]
 
-        if RUNTIME > 10:
-            RUNTIME = 10
+        if RUNTIME > timeLimit:
+            RUNTIME = timeLimit
 
-        with open(f"foo.txt", "a") as f:
-            f.write(f"{RUNTIME},{model.MIPGap},{returnList[0][1]}\n")
+
+        # with open(f"foo.txt", "a") as f:
+        #     f.write(f"{numLines}, {RUNTIME}, {model.MIPGap}, {1 if model.Status == GRB.TIME_LIMIT else 0}, {model.ObjVal}\n")
+
         # creating pdftitle for visualizer
         whatIfOut = ""
         if len(whatIfs) > 0:
             whatIfOut = "withWhatIfs"
+            
         pdfTitle = f"{numBoats}boats{numLines}lines{Weight}weight{stepNumber}step{whatIfOut}{boatOriginCorner}.pdf"  
+
         #appending pdfTitle to returnList for pdf merging
         returnList.append(pdfTitle)
         returnList.append(trueObjectiveValue)
@@ -289,7 +292,7 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
 
         if(SHOWPATHS):
             #sending solution to formulator
-            visualizer.printProblem(model, X, numBoats, numLines, numEndPoints, points, Weight, transitSpeed, surveySpeed, toPDF, model.status == GRB.TIME_LIMIT, maxes, pdfTitle, pathMatrix)
+            visualizer.printProblem(model, X, numBoats, numLines, numEndPoints, points, Weight, transitSpeeds, surveySpeeds, toPDF, model.status == GRB.TIME_LIMIT, maxes, pdfTitle, pathMatrices)
         
         print("Total run time:", RUNTIME)
         cycles = newFindCycles(X, numBoats, numLines)
@@ -309,7 +312,7 @@ def solve(numBoats, numEndPoints, points, numLines, costMatrix, Weight, transitS
     
     else:
         print(f"No solution found for {numLines} lines, {numBoats} boats,  status code: {model.status}")
-        with open(f"foo.txt", "a") as f:
-            f.write(f"{numLines} no solution!\n")
+        # with open(f"foo.txt", "a") as f:
+        #     f.write(f"{numLines} no solution!\n")
         # Solution was infeaseable
         return [[1]]

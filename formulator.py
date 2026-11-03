@@ -7,7 +7,7 @@ import solver
 import dubins
 
 
-def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLines, toPDF, whatIfs, lineGenerationType, writeToFileName, numSteps, boatOriginCorner, minimumRadius):
+def formulate(fileName, numBoats, weights, surveySpeeds, transitSpeeds, numGenLines, toPDF, whatIfs, lineGenerationType, writeToFileName, numSteps, boatOriginCorner, minimumRadii, timeLimit=10):
     #x min and max for graphing purposes
     x_max = float(-inf)
     x_min = float(inf)
@@ -25,10 +25,12 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
         #reading points from csv file
         try:
             with open(fileName, mode='r', newline='', encoding='utf-8') as file:
+                startingIndex = 1
                 csv_reader = csv.reader(file)
                 for row in csv_reader:
                     if(len(row) > 0):
-                        adjRow = [[float(row[0]), float(row[1])], [float(row[2]), float(row[3])]]
+
+                        adjRow = [[float(row[startingIndex]), float(row[startingIndex+1])], [float(row[startingIndex+2]), float(row[startingIndex+3])]]
 
                         x_max = max(x_max, max(adjRow[0][0], adjRow[1][0]))
                         x_min = min(x_min, min(adjRow[0][0], adjRow[1][0]))
@@ -49,12 +51,43 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
         #number of columns
         columns = 1
         #width of columns
-        width = 30
+        width = 500
         #spacing between columns
         column_spacing = 5
-        
+        #spacing between lines
+        line_spacing = 5
+
+        #formulate problem in rotated column formation
+        if lineGenerationType == 5:
+            numLines = numGenLines * columns
+
+            maxCoordinate = 50 + (numGenLines * 10)
+            
+            for i in range(columns):
+                origin = [random.random()*maxCoordinate, random.random()*maxCoordinate]
+
+                theta1 = random.random()*np.pi*2
+                theta2 = theta1 + random.random()*np.pi/2
+                theta3 = theta2 - np.pi/2
+
+                end = [origin[0] + np.cos(theta3)*width, origin[1] + np.sin(theta3)*width]
+                
+                step = [np.cos(theta2), np.sin(theta2)]
+                for j in range(numGenLines):
+                        adjRow = [[origin[0] + step[0] * j * line_spacing, origin[1] + step[1] * j * line_spacing], [end[0] + step[0] * j * line_spacing, end[1] + step[1] * j * line_spacing]]
+
+                        x_max = max(x_max, max(adjRow[0][0], adjRow[1][0]))
+                        x_min = min(x_min, min(adjRow[0][0], adjRow[1][0]))
+
+                        y_max = max(y_max, max(adjRow[0][1], adjRow[1][1]))
+                        y_min = min(y_min, min(adjRow[0][1], adjRow[1][1]))
+                                
+                        points.append(adjRow[0])
+                        points.append(adjRow[1])
+                        segments.append(adjRow)
+
         #formulate problem in broken segmented column formation
-        if lineGenerationType == 4:
+        elif lineGenerationType == 4:
             #number of segments per column
             numSegments = 5
 
@@ -87,7 +120,7 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
             for i in range(columns):
                 for j in range(1,(numGenLines + 1)):
                     for k in range(numSegments):
-                        adjRow = [[width * i + (k * width / numSegments) + column_spacing * i, j], [width * i + ((k + 1) * width / numSegments) + column_spacing * i, j]]
+                        adjRow = [[width * i + (k * width / numSegments) + column_spacing * i, j * line_spacing], [width * i + ((k + 1) * width / numSegments) + column_spacing * i, j * line_spacing]]
 
                         x_max = max(x_max, max(adjRow[0][0], adjRow[1][0]))
                         x_min = min(x_min, min(adjRow[0][0], adjRow[1][0]))
@@ -108,7 +141,7 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
                 for j in range(1,(numGenLines + 1)):
                     randLeft = random.random() * width / 2 
                     randRight = (random.random() + 1) * width / 2
-                    adjRow = [[width * i + randLeft + column_spacing * i, j], [width * (i + .5) + randRight + column_spacing * i, j]]
+                    adjRow = [[width * i + randLeft + column_spacing * i, j * line_spacing], [width * (i + .5) + randRight + column_spacing * i, j * line_spacing]]
                     
                     x_max = max(x_max, max(adjRow[0][0], adjRow[1][0]))
                     x_min = min(x_min, min(adjRow[0][0], adjRow[1][0]))
@@ -125,9 +158,13 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
 
             numLines = numGenLines
 
-            maxCoordinate = 50
+            maxCoordinate = 1000
+            maxLineLength = 100
             for j in range(0,numGenLines):
-                    adjRow = [[random.random()*maxCoordinate, random.random()*maxCoordinate], [random.random()*maxCoordinate, random.random()*maxCoordinate]]
+                    randomStartPoint = [random.random()*maxCoordinate, random.random()*maxCoordinate]
+                    randomAngle = random.random() * 2 * np.pi
+                    randomEndPoint = [randomStartPoint[0] + maxLineLength * np.cos(randomAngle), randomStartPoint[1] + maxLineLength * np.sin(randomAngle)]
+                    adjRow = [randomStartPoint, randomEndPoint]
 
                     x_max = max(x_max, max(adjRow[0][0], adjRow[1][0]))
                     x_min = min(x_min, min(adjRow[0][0], adjRow[1][0]))
@@ -145,7 +182,7 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
 
             for i in range(columns):
                 for j in range(1,(numGenLines + 1)):
-                    adjRow = [[width * i + column_spacing * i, j], [width * (i + 1) + column_spacing * i, j]]
+                    adjRow = [[width * i + column_spacing * i, j * line_spacing], [width * (i + 1) + column_spacing * i, j * line_spacing]]
 
                     x_max = max(x_max, max(adjRow[0][0], adjRow[1][0]))
                     x_min = min(x_min, min(adjRow[0][0], adjRow[1][0]))
@@ -217,7 +254,7 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
     maxes = [[x_min - x_offset - numBoats*x_spacing, 0], [x_max + x_offset + numBoats*x_spacing, 0], [0, y_min - y_offset - numBoats*y_spacing], [0, y_max + y_offset + numBoats*y_spacing]]
 
 
-    costMatrix, pathMatrix = createMatrices(numEndPoints, numBoats, numLines, points, transitSpeed, surveySpeed, minimumRadius)
+    costMatrices, pathMatrices = createMatrices(numEndPoints, numBoats, numLines, points, transitSpeeds, surveySpeeds, minimumRadii)
 
     outputs = []
     
@@ -225,16 +262,16 @@ def formulate(fileName, numBoats, weights, surveySpeed, transitSpeed, numGenLine
     #solve formulated problem for each weight passed in
     for weight in weights:
         #sending problem to solver
-        outputs.append(solver.solve(numBoats, numEndPoints, points, numLines, costMatrix, weight, transitSpeed, surveySpeed, toPDF, 0, whatIfs, None, boatOriginCorner, pathMatrix))
+        outputs.append(solver.solve(numBoats, numEndPoints, points, numLines, costMatrices, weight, transitSpeeds, surveySpeeds, toPDF, 0, whatIfs, None, boatOriginCorner, pathMatrices, timeLimit=timeLimit))
         if numSteps > 0:
             stepNumber = 1
-            stepThrough(outputs[i-1], numSteps, points, numBoats, numEndPoints, transitSpeed, surveySpeed, weight, toPDF, outputs, stepNumber, maxes, boatOriginCorner)
+            stepThrough(outputs[i-1], numSteps, points, numBoats, numEndPoints, transitSpeeds, surveySpeeds, weight, toPDF, outputs, stepNumber, maxes, boatOriginCorner)
         
     return outputs
 
 
 # stepThrough divides the initial solution's makespan by the number of steps provided and progesses each boat along its path in the solution by that step time/distance
-def stepThrough(solution, numSteps, points, numBoats, numEndPoints, transitSpeed, surveySpeed, weight, toPDF, outputs, stepNumber, maxes, boatOriginCorner):
+def stepThrough(solution, numSteps, points, numBoats, numEndPoints, transitSpeeds, surveySpeeds, weight, toPDF, outputs, stepNumber, maxes, boatOriginCorner, minimumRadii):
     #pathsList format: index = boat number, list element = [starting point, ending point, isSurveyLine]
     pathsList = [[] for _ in range(numBoats)]
     boatStarts = [[] for _ in range(numBoats)] 
@@ -258,10 +295,10 @@ def stepThrough(solution, numSteps, points, numBoats, numEndPoints, transitSpeed
             else: 
                 mid = getMid(end)
                 pathsList[line[0]].append([points[start], points[mid], False])
-                boatTimes[line[0]] += findEuclideanDistance(points[start], points[mid]) / transitSpeed
+                boatTimes[line[0]] += findEuclideanDistance(points[start], points[mid]) / transitSpeeds[line[0]]
 
                 pathsList[line[0]].append([points[mid], points[end], True])
-                boatTimes[line[0]] += findEuclideanDistance(points[mid], points[end]) / surveySpeed
+                boatTimes[line[0]] += findEuclideanDistance(points[mid], points[end]) / surveySpeeds[line[0]]
                 
                 #origin point
                 if start >= numEndPoints and start < numEndPoints+numBoats:
@@ -335,8 +372,8 @@ def stepThrough(solution, numSteps, points, numBoats, numEndPoints, transitSpeed
         
         #re-solve problem with remaining boats and survey lines
         if remainingBoats > 0:
-            costMatrix, pathMatrix = createMatrices(newNumEndpoints, remainingBoats, newNumLines, newPoints, transitSpeed, surveySpeed)
-            output = solver.solve(remainingBoats, newNumEndpoints, newPoints, newNumLines, costMatrix, weight, transitSpeed, surveySpeed, toPDF, stepNumber, [], maxes, boatOriginCorner)
+            costMatrices, pathMatrices = createMatrices(newNumEndpoints, remainingBoats, newNumLines, newPoints, transitSpeeds, surveySpeeds, minimumRadii)
+            output = solver.solve(remainingBoats, newNumEndpoints, newPoints, newNumLines, costMatrices, weight, transitSpeeds, surveySpeeds, toPDF, stepNumber, [], maxes, boatOriginCorner, pathMatrices)
             print(f"step #: {i}")
             if not stepThroughChecker(sortedPaths, newPoints, output, remainingBoats, finishedBoats):
                 retainedPath = False
@@ -416,80 +453,102 @@ def findNewStart(point1, point2, d):
     return [point1[0] + x, point1[1] + y]
 
 
-def createMatrices(numEndPoints, numBoats, numLines, points, transitSpeed, surveySpeed, minimumRadius):
+def createMatrices(numEndPoints, numBoats, numLines, points, transitSpeeds, surveySpeeds, minimumRadii):
     startTime = timer()
-    
-    # Create Cost Matrix
-    CostMatrixSize = numEndPoints + numBoats + numBoats
-    costMatrix = np.array([[0.0]*(CostMatrixSize)]*(CostMatrixSize))
-    costMatrix2 = np.array([[0.0]*(CostMatrixSize)]*(CostMatrixSize))
+    costMatrices = []
+    pathMatrices = []
 
-    # Create Path Matrix (for visualizer)
-    pathMatrix = [[[] for _ in range(CostMatrixSize)] for _ in range(CostMatrixSize)]
-    
-    # Calculate the Euclidean distances and create the cost matrix
-    for i in range(CostMatrixSize):
-        for j in range(CostMatrixSize):
-            costMatrix2[i][j] = findEuclideanDistance(points[i], points[j])
-            # costMatrix2[i][j] = np.linalg.norm(np.array(points[i]) - np.array(points[j]))
+    allEqual = True
+    for boatNumber in range(numBoats):
+        if minimumRadii[0] != minimumRadii[boatNumber] or transitSpeeds[0] != transitSpeeds[boatNumber] or surveySpeeds[0] != surveySpeeds[boatNumber]:
+            allEqual = False
+            break
 
-    # Calculates the path length from one endpoint to the end of a survey line
-    # path length as distance to any given point plus the distance of traversing the survey line
-    for l in range(numLines):
-        # endpoints j and k of line l
-        j, k = [2*l, 2*l+1]
-        for i in range(numEndPoints):
-            if(i != j and i != k):
-                # endpoints i and e of line that includes i
-                e = i-1
+    for boatNumber in range(numBoats):
+        # Create Cost Matrix
+        CostMatrixSize = numEndPoints + numBoats + numBoats
+        costMatrix = np.array([[0.0]*(CostMatrixSize)]*(CostMatrixSize))
+        costMatrix2 = np.array([[0.0]*(CostMatrixSize)]*(CostMatrixSize))
+
+        # Create Path Matrix (for visualizer)
+        if minimumRadii[boatNumber] == 0:
+            pathMatrix = None
+        else:
+            pathMatrix = [[[] for _ in range(CostMatrixSize)] for _ in range(CostMatrixSize)]
+        
+        # Calculate the Euclidean distances and create the cost matrix
+        for i in range(CostMatrixSize):
+            for j in range(CostMatrixSize):
+                costMatrix2[i][j] = findEuclideanDistance(points[i], points[j])
+
+        # Calculates the path length from one endpoint to the end of a survey line
+        # path length as distance to any given point plus the distance of traversing the survey line
+        for l in range(numLines):
+            # endpoints j and k of line l
+            j, k = [2*l, 2*l+1]
+            for i in range(numEndPoints):
+                if(i != j and i != k):
+                    # endpoints i and e of line that includes i
+                    e = i-1
+                    if (i % 2) == 0:
+                        e = i+1
+                    #applies transit/survey speeds to cost aka distance travelled per possible line
+                    if minimumRadii[boatNumber] == 0:
+                        costMatrix[j][i] = costMatrix2[j][e]/transitSpeeds[boatNumber] + costMatrix2[e][i]/surveySpeeds[boatNumber]
+                        costMatrix[k][i] = costMatrix2[k][e]/transitSpeeds[boatNumber] + costMatrix2[e][i]/surveySpeeds[boatNumber]
+                        costMatrix[i][j] = costMatrix2[i][k]/transitSpeeds[boatNumber] + costMatrix2[k][j]/surveySpeeds[boatNumber]
+                        costMatrix[i][k] = costMatrix2[i][j]/transitSpeeds[boatNumber] + costMatrix2[j][k]/surveySpeeds[boatNumber]
+                    else:
+                        # shortestPath format: [pathLength, [pathName,  pathSegments[]]]
+                        jiPath = dubins.findShortestPath(points[k], points[j], points[e], points[i], minimumRadii[boatNumber])
+                        kiPath = dubins.findShortestPath(points[j], points[k], points[e], points[i], minimumRadii[boatNumber])
+                        ijPath = dubins.findShortestPath(points[e], points[i], points[k], points[j], minimumRadii[boatNumber])
+                        ikPath = dubins.findShortestPath(points[e], points[i], points[j], points[k], minimumRadii[boatNumber])
+
+                        costMatrix[j][i] = jiPath[0]/transitSpeeds[boatNumber] + costMatrix2[e][i]/surveySpeeds[boatNumber]
+                        costMatrix[k][i] = kiPath[0]/transitSpeeds[boatNumber] + costMatrix2[e][i]/surveySpeeds[boatNumber]
+                        costMatrix[i][j] = ijPath[0]/transitSpeeds[boatNumber] + costMatrix2[k][j]/surveySpeeds[boatNumber]
+                        costMatrix[i][k] = ikPath[0]/transitSpeeds[boatNumber] + costMatrix2[j][k]/surveySpeeds[boatNumber]
+
+                        pathMatrix[j][i] = jiPath[1]
+                        pathMatrix[k][i] = kiPath[1]
+                        pathMatrix[i][j] = ijPath[1]
+                        pathMatrix[i][k] = ikPath[1]
+
+
+        # Calculates the path length from one endpoint to a rendezvous point and start to any endpoint
+        for boat in range(numBoats):
+            for i in range(numEndPoints):
+                k = i-1
                 if (i % 2) == 0:
-                    e = i+1
-                #applies transit/survey speeds to cost aka distance travelled per possible line
-                # costMatrix[j][i] = costMatrix2[j][e]/transitSpeed + costMatrix2[e][i]/surveySpeed
-                # costMatrix[k][i] = costMatrix2[k][e]/transitSpeed + costMatrix2[e][i]/surveySpeed
-                # costMatrix[i][j] = costMatrix2[i][k]/transitSpeed + costMatrix2[k][j]/surveySpeed
-                # costMatrix[i][k] = costMatrix2[i][j]/transitSpeed + costMatrix2[j][k]/surveySpeed
+                    k = i+1
 
-                # shortestPath format: [pathLength, [pathName,  pathSegments[]]]
-                jiPath = dubins.findShortestPath(points[k], points[j], points[e], points[i], minimumRadius)
-                kiPath = dubins.findShortestPath(points[j], points[k], points[e], points[i], minimumRadius)
-                ijPath = dubins.findShortestPath(points[e], points[i], points[k], points[j], minimumRadius)
-                ikPath = dubins.findShortestPath(points[e], points[i], points[j], points[k], minimumRadius)
+                if minimumRadii[boatNumber] == 0:
+                    costMatrix[numEndPoints+boat][i] = costMatrix2[numEndPoints+boat][k]/transitSpeeds[boatNumber] + costMatrix2[k][i]/surveySpeeds[boatNumber]
+                    costMatrix[i][numEndPoints+numBoats+boat] = costMatrix2[i][numEndPoints+numBoats+boat]/transitSpeeds[boatNumber]
+                else:
+                    originPath = dubins.findShortestPath(None, points[numEndPoints+boat], points[k], points[i], minimumRadii[boatNumber])
+                    rendezvousPath = dubins.findShortestPath(points[k], points[i], points[numEndPoints+numBoats+boat], None, minimumRadii[boatNumber])
 
-                costMatrix[j][i] = jiPath[0]/transitSpeed + costMatrix2[e][i]/surveySpeed
-                costMatrix[k][i] = kiPath[0]/transitSpeed + costMatrix2[e][i]/surveySpeed
-                costMatrix[i][j] = ijPath[0]/transitSpeed + costMatrix2[k][j]/surveySpeed
-                costMatrix[i][k] = ikPath[0]/transitSpeed + costMatrix2[j][k]/surveySpeed
+                    costMatrix[numEndPoints+boat][i] = originPath[0]/transitSpeeds[boatNumber] + costMatrix2[k][i]/surveySpeeds[boatNumber]
+                    costMatrix[i][numEndPoints+numBoats+boat] = rendezvousPath[0]/transitSpeeds[boatNumber]
 
-                pathMatrix[j][i] = jiPath[1]
-                pathMatrix[k][i] = kiPath[1]
-                pathMatrix[i][j] = ijPath[1]
-                pathMatrix[i][k] = ikPath[1]
+                    pathMatrix[numEndPoints+boat][i] = originPath[1]
+                    pathMatrix[i][numEndPoints+numBoats+boat] = rendezvousPath[1]
 
+        costMatrices.append(costMatrix)
+        pathMatrices.append(pathMatrix)
 
-    # Calculates the path length from one endpoint to a rendezvous point and start to any endpoint
-    for boat in range(numBoats):
-        for i in range(numEndPoints):
-            k = i-1
-            if (i % 2) == 0:
-                k = i+1
-            # costMatrix[numEndPoints+boat][i] = costMatrix2[numEndPoints+boat][k]/transitSpeed + costMatrix2[k][i]/surveySpeed
-            # costMatrix[i][numEndPoints+numBoats+boat] = costMatrix2[i][numEndPoints+numBoats+boat]/transitSpeed
-
-            originPath = dubins.findShortestPath(None, points[numEndPoints+boat], points[k], points[i], minimumRadius)
-            rendezvousPath = dubins.findShortestPath(points[k], points[i], points[numEndPoints+numBoats+boat], None, minimumRadius)
-
-            costMatrix[numEndPoints+boat][i] = originPath[0]/transitSpeed + costMatrix2[k][i]/surveySpeed
-            costMatrix[i][numEndPoints+numBoats+boat] = rendezvousPath[0]/transitSpeed
-
-            pathMatrix[numEndPoints+boat][i] = originPath[1]
-            pathMatrix[i][numEndPoints+numBoats+boat] = rendezvousPath[1]
+        if allEqual:
+            costMatrices = costMatrices * numBoats
+            pathMatrices = pathMatrices * numBoats
+            break
 
     endTime = timer()
 
     RUNTIME = endTime - startTime
     
-    return (costMatrix, pathMatrix)
+    return (costMatrices, pathMatrices)
 
 
    
