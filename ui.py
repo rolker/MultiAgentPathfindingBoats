@@ -120,12 +120,12 @@ def selectFileName(text):
     
 def formulateProblem(): 
     #default settings
-    weights = [1]
     numBoats = 1
-    surveySpeeds = [1]
-    transitSpeeds = [1]
-    minimumRadii = [0]
     numLines = 0
+    weights = [1]
+    transitSpeeds = [1]
+    surveySpeeds = [1]
+    minimumRadii = [0]
     whatIfs = []
     generationType = 0
     numSteps = 0
@@ -310,9 +310,9 @@ def formulateProblem():
 
     if (len(generationText.get(1.0, "end-1c")) != 0):   
         try:
-            generation = int(generationText.get(1.0, "end-1c"))
+            generationType = int(generationText.get(1.0, "end-1c"))
             errorLabel.config(text="")
-            if generation > 5 or generation < 0:
+            if generationType > 5 or generationType < 0:
                 errorLabel.config(text=f"{generationText.get(1.0, "end-1c")} is not a valid generation type")
                 return
         except ValueError:
